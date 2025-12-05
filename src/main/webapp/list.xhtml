@@ -86,22 +86,27 @@
     <!-- Импорт CSV -->
     <h3>Массовый импорт организаций</h3>
     <h:form enctype="multipart/form-data">
-        <p:fileUpload
-                fileUploadListener="#{organizationView.handleFileUpload}"
-                mode="advanced"
-                skinSimple="true"
-                allowTypes="/(\.|\/)(csv)$/i"
-                label="Выберите CSV-файл"
-                uploadLabel="Загрузить"
-                cancelLabel="Отмена"
-                auto="false" />
+        <!-- ИСПРАВЛЕНИЕ: auto="false", чтобы загрузка происходила явно (по кнопке "Загрузить") -->
+        <!-- Добавлено update, чтобы обновить форму и избежать потери состояния бина -->
+        <p:fileUpload id="csvUploader"
+                      fileUploadListener="#{organizationView.handleFileUpload}"
+                      mode="advanced"
+                      skinSimple="true"
+                      allowTypes="/(\.|\/)(csv)$/i"
+                      label="Выберите CSV-файл"
+                      uploadLabel="Загрузить"
+                      cancelLabel="Отмена"
+                      auto="false"
+                      update="importMessages" />  <!-- Важно: обновляем только сообщения после handleFileUpload -->
 
-        <h:commandButton value="Импортировать"
+        <!-- ИСПРАВЛЕНИЕ: Используем p:commandButton для лучшей интеграции с PrimeFaces AJAX -->
+        <p:commandButton value="Импортировать"
                          action="#{organizationView.importCsv}"
-                         onclick="PF('statusDialog').show();">
-            <f:ajax execute="@form" render="importMessages statusDialog" onevent="hideStatusDialog" />
-        </h:commandButton>
+                         update=":mainForm:mainDataTable importMessages"
+                         onstart="PF('statusDialog').show();"
+                         oncomplete="PF('statusDialog').hide();" />
 
+        <!-- Перемещаем p:messages и p:dialog внутрь h:form для корректной работы AJAX-обновления -->
         <p:dialog widgetVar="statusDialog" modal="true" draggable="false" closable="false"
                   header="Импорт..." resizable="false">
             <p:progressBar mode="indeterminate" style="width:300px" />
@@ -109,12 +114,8 @@
 
         <p:messages id="importMessages" autoUpdate="true" showDetail="true" />
     </h:form>
-    <p:dialog widgetVar="statusDialog" modal="true" draggable="false" closable="false"
-              header="Импорт..." resizable="false">
-        <p:progressBar mode="indeterminate" style="width:300px" />
-    </p:dialog>
 
-    <p:messages id="importMessages" autoUpdate="true" showDetail="true" />
+    <!-- УДАЛЕНЫ дубликаты p:dialog и p:messages, которые находились здесь -->
 
     <!-- МОДАЛЬНОЙ ОКНО ПОДРОБНОСТЕЙ ОБ ОРГАНИЗАЦИИ -->
     <h:panelGroup id="modalPanel">
@@ -625,6 +626,13 @@
         }
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
+        }
+        // Опционально: функция для скрытия статуса после успешного AJAX-вызова
+        function hideStatusDialog(data) {
+            var status = data.status;
+            if (status === 'success') {
+                PF('statusDialog').hide();
+            }
         }
     </script>
 

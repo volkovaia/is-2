@@ -6,6 +6,10 @@ import jakarta.faces.context.FacesContext;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
 import org.primefaces.component.fileupload.FileUpload;
 import org.primefaces.event.FileUploadEvent;
 import org.primefaces.model.file.UploadedFile;
@@ -30,6 +34,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Data
@@ -78,6 +83,13 @@ public class OrganizationView implements Serializable {
 
     private UploadedFile uploadedFile;
 
+    private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+    private final Validator validator = factory.getValidator();
+
+    public <T> Set<ConstraintViolation<T>> validateDto(T dto) {
+        return validator.validate(dto);
+    }
+
     public void handleFileUpload(FileUploadEvent event) {
         this.uploadedFile = event.getFile();
         System.out.println("Файл получен: " + uploadedFile.getFileName());
@@ -109,11 +121,23 @@ public class OrganizationView implements Serializable {
 //        }
 //    }
 
+    public void addInfoMessage(String message) {
+        System.out.println("[INFO] " + message);
+    }
+
+    // Метод для вывода сообщений об ошибках
+    public void addErrorMessage(String message) {
+        System.err.println("[ERROR] " + message);
+    }
+
+    public void addWarnMessage(String message) {
+        System.err.println("[WARN] " + message);
+    }
     public void importCsv() {
         System.out.println("=== importCsv() STARTED ===");
 
         if (uploadedFile == null) {
-            addErrorMessage("Файл не выбран");
+            addErrorMessage("File not selected");
             return;
         }
 
@@ -163,7 +187,7 @@ public class OrganizationView implements Serializable {
 
         // ✅ Теперь — единая транзакция
         try {
-            int importedCount = organizationService.importOrganizations(parsedOrganizations);
+            int importedCount = organizationService.importFromCsv(parsedOrganizations);
             addInfoMessage("Успешно импортировано " + importedCount + " организаций");
             loadAll();
         } catch (Exception e) {
@@ -173,6 +197,64 @@ public class OrganizationView implements Serializable {
         }
     }
 
+    public OrganizationRequestDTO parseCsvLine(String line) throws Exception {
+        String[] parts = line.split(","); // Разделитель - запятая
+
+        // ОЖИДАЕТСЯ 12 ПОЛЕЙ!
+        if (parts.length < 12) {
+            throw new IllegalArgumentException("Неверное количество полей в строке CSV. Ожидается 12.");
+        }
+
+        try {
+            String name = parts[0].trim().replace("\"", "");
+            String fullName = parts[1].trim().replace("\"", "");
+            OrganizationType type = OrganizationType.valueOf(parts[2].trim().toUpperCase().replace("\"", ""));
+
+            // Обработка пустых строк для числовых полей
+            double annualTurnover = parts[3].trim().isEmpty() ? 0.0 : Double.parseDouble(parts[3].trim().replace("\"", ""));
+            int employeesCount = parts[4].trim().isEmpty() ? 0 : Integer.parseInt(parts[4].trim().replace("\"", ""));
+            float rating = parts[5].trim().isEmpty() ? 0.0f : Float.parseFloat(parts[5].trim().replace("\"", ""));
+            double coordX = parts[6].trim().isEmpty() ? 0.0 : Double.parseDouble(parts[6].trim().replace("\"", ""));
+            long coordY = parts[7].trim().isEmpty() ? 0L : Long.parseLong(parts[7].trim().replace("\"", ""));
+
+            String officialStreet = parts[8].trim().replace("\"", "");
+            String officialZipCode = parts[9].trim().replace("\"", ""); // Добавлено
+            String postalStreet = parts[10].trim().replace("\"", "");
+            String postalZipCode = parts[11].trim().replace("\"", ""); // Добавлено
+
+
+            Coordinates coordinates = Coordinates.builder()
+                    .x(coordX)
+                    .y((int) coordY)
+                    .build();
+
+            Address officialAddress = Address.builder()
+                    .street(officialStreet)
+                    .zipCode(officialZipCode.isEmpty() ? null : officialZipCode) // Учитываем пустое значение
+                    .build();
+
+            Address postalAddress = Address.builder()
+                    .street(postalStreet)
+                    .zipCode(postalZipCode.isEmpty() ? null : postalZipCode) // Учитываем пустое значение
+                    .build();
+
+
+            return OrganizationRequestDTO.builder()
+                    .name(name)
+                    .coordinates(coordinates)
+                    .officialAddress(officialAddress)
+                    .annualTurnover(annualTurnover)
+                    .employeesCount(employeesCount)
+                    .rating(rating)
+                    .fullName(fullName)
+                    .type(type)
+                    .postalAddress(postalAddress)
+                    .build();
+
+        } catch (Exception e) {
+            throw new Exception("Ошибка парсинга строки CSV. Проверьте форматирование и типы данных: " + e.getMessage());
+        }
+    }
 
 
     @PostConstruct

@@ -118,41 +118,57 @@ public class OrganizationService {
 
     }
 
+//    @Transactional
+//    public int importFromCsv(InputStream csvStream) throws IOException {
+//        List<Organization> organizations = new ArrayList<>();
+//
+//        try (CSVParser parser = CSVFormat.DEFAULT
+//                .withFirstRecordAsHeader()
+//                .withIgnoreEmptyLines()
+//                .withTrim()
+//                .parse(new InputStreamReader(csvStream, StandardCharsets.UTF_8))) {
+//
+//            int lineNumber = 1; // первая строка — заголовки, данные с 2-й
+//            for (CSVRecord record : parser) {
+//                lineNumber++;
+//
+//                try {
+//                    Organization org = parseCsvRecord(record);
+//                    validateOrganization(org); // ← ваша же валидация!
+//                    // ID и creationDate проставятся автоматически при persist
+//                    org.setId(null); // гарантируем генерацию нового ID
+//                    org.setCreationDate(null); // будет проставлено триггером / listeners / в репозитории
+//                    organizations.add(org);
+//                } catch (Exception e) {
+//                    throw new IllegalArgumentException("Ошибка в строке " + lineNumber + ": " + e.getMessage(), e);
+//                }
+//            }
+//
+//            // Сохраняем все — если где-то ошибка → откат всей транзакции
+//            for (Organization org : organizations) {
+//                organizationRepository.create(org); // ваш метод create()
+//            }
+//
+//            return organizations.size();
+//        }
+//    }
+
+
     @Transactional
-    public int importFromCsv(InputStream csvStream) throws IOException {
-        List<Organization> organizations = new ArrayList<>();
+    public int importFromCsv(List<OrganizationRequestDTO> organizationRequestDTOS) {
+        List<Organization> organizations = organizationRequestDTOS.stream()
+                .map(OrganizationMapper::toOrganization)
+                .collect(Collectors.toList());
 
-        try (CSVParser parser = CSVFormat.DEFAULT
-                .withFirstRecordAsHeader()
-                .withIgnoreEmptyLines()
-                .withTrim()
-                .parse(new InputStreamReader(csvStream, StandardCharsets.UTF_8))) {
-
-            int lineNumber = 1; // первая строка — заголовки, данные с 2-й
-            for (CSVRecord record : parser) {
-                lineNumber++;
-
-                try {
-                    Organization org = parseCsvRecord(record);
-                    validateOrganization(org); // ← ваша же валидация!
-                    // ID и creationDate проставятся автоматически при persist
-                    org.setId(null); // гарантируем генерацию нового ID
-                    org.setCreationDate(null); // будет проставлено триггером / listeners / в репозитории
-                    organizations.add(org);
-                } catch (Exception e) {
-                    throw new IllegalArgumentException("Ошибка в строке " + lineNumber + ": " + e.getMessage(), e);
-                }
-            }
-
-            // Сохраняем все — если где-то ошибка → откат всей транзакции
-            for (Organization org : organizations) {
-                organizationRepository.create(org); // ваш метод create()
-            }
-
-            return organizations.size();
+        for (Organization org : organizations) {
+            validateOrganization(org);
+            org.setId(null);
+            org.setCreationDate(null);
+            organizationRepository.create(org);
         }
-    }
 
+        return organizations.size();
+    }
     private Organization parseCsvRecord(CSVRecord record) {
         Organization org = new Organization();
 

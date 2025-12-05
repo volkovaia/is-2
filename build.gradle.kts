@@ -40,6 +40,10 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+}
+
 tasks.war {
     archiveFileName.set("lab1.war")
 

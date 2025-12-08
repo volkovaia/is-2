@@ -14,6 +14,7 @@
         <class>organization.entity.Coordinates</class>
         <class>organization.entity.Address</class>
         <class>organization.entity.Location</class>
+        <class>organization.entity.ImportHistory</class>
 <!--        <class>organization.entity.TestEntity</class>-->
 
         <properties>

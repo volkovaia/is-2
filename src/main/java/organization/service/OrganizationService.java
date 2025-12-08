@@ -123,6 +123,25 @@ public class OrganizationService {
         return organizationRepository.countByTypeLessThan(OrganizationMapper.toOrganizationType(type));
     }
 
+//    @Transactional
+//    public OrganizationResponseDTO mergeOrganizations(OrganizationMergeRequestDTO dto) {
+//        Organization org1 = organizationRepository.findById(dto.getOrgId1());
+//        Organization org2 = organizationRepository.findById(dto.getOrgId2());
+//        if (org1 == null || org2 == null) {
+//            throw new IllegalArgumentException("Одна из организаций не найдена");
+//        }
+//        org1.setName(dto.getNewName());
+//        org1.setFullName(dto.getNewName());
+//        org1.setPostalAddress(dto.getNewAddress());
+//        org1.setAnnualTurnover(
+//                (org1.getAnnualTurnover() != null ? org1.getAnnualTurnover() : 0)
+//                        + (org2.getAnnualTurnover() != null ? org2.getAnnualTurnover() : 0)
+//        );
+//        org1.setEmployeesCount(org1.getEmployeesCount() + org2.getEmployeesCount());
+//        organizationRepository.delete(org2);
+//        return OrganizationMapper.toOrganizationResponseDTO(org1);
+//    }
+
     @Transactional
     public OrganizationResponseDTO mergeOrganizations(OrganizationMergeRequestDTO dto) {
         Organization org1 = organizationRepository.findById(dto.getOrgId1());
@@ -130,9 +149,16 @@ public class OrganizationService {
         if (org1 == null || org2 == null) {
             throw new IllegalArgumentException("Одна из организаций не найдена");
         }
+
+        // 1. ПРЕОБРАЗОВАНИЕ DTO -> ENTITY
+        Address newPostalAddress = OrganizationMapper.toAddress(dto.getNewAddress());
+
         org1.setName(dto.getNewName());
         org1.setFullName(dto.getNewName());
-        org1.setPostalAddress(dto.getNewAddress());
+
+        // ИСПРАВЛЕНИЕ ТИПОВ: используем маппер
+        org1.setPostalAddress(newPostalAddress);
+
         org1.setAnnualTurnover(
                 (org1.getAnnualTurnover() != null ? org1.getAnnualTurnover() : 0)
                         + (org2.getAnnualTurnover() != null ? org2.getAnnualTurnover() : 0)
@@ -141,6 +167,7 @@ public class OrganizationService {
         organizationRepository.delete(org2);
         return OrganizationMapper.toOrganizationResponseDTO(org1);
     }
+
 
     @Transactional
     public OrganizationResponseDTO absorbOrganization(OrganizationAbsorbRequestDTO dto) {

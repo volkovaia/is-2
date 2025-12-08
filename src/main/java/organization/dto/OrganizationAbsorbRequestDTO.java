@@ -11,6 +11,6 @@ import organization.entity.Address;
 public class OrganizationAbsorbRequestDTO {
     private Long orgId1;
     private Long orgId2;
-    private Address newAddress;
+    private AddressRequestDTO newAddress;
 
 }

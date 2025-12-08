@@ -25,10 +25,10 @@ public class OrganizationRequestDTO {
     private String name;
 
     @NotNull
-    private Coordinates coordinates;
+    private CoordinatesRequestDTO coordinates;
 
     @NotNull
-    private Address officialAddress;
+    private AddressRequestDTO officialAddress;
 
     @Positive(message = "Значение поля должно быть больше 0")
     private Double annualTurnover;
@@ -52,6 +52,6 @@ public class OrganizationRequestDTO {
 
     @NotNull
     @OneToOne(cascade = CascadeType.ALL)
-    private Address postalAddress;
+    private AddressRequestDTO postalAddress;
 
 }

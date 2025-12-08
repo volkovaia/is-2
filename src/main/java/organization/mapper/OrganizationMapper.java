@@ -43,20 +43,47 @@ public class OrganizationMapper {
         return organization;
     }
 
+//    public static Organization toOrganization(OrganizationRequestDTO organizationRequestDTO) {
+//        if (organizationRequestDTO == null) return null;
+//        Organization organization = new Organization();
+//        organization.setName(organizationRequestDTO.getName());
+//        organization.setCoordinates(organizationRequestDTO.getCoordinates());
+//        organization.setOfficialAddress(organizationRequestDTO.getOfficialAddress());
+//        organization.setAnnualTurnover(organizationRequestDTO.getAnnualTurnover());
+//        organization.setEmployeesCount(organizationRequestDTO.getEmployeesCount());
+//        organization.setRating(organizationRequestDTO.getRating());
+//        organization.setFullName(organizationRequestDTO.getFullName());
+//        organization.setType(organizationRequestDTO.getType());
+//        organization.setPostalAddress(organizationRequestDTO.getPostalAddress());
+//        return organization;
+//    }
+
     public static Organization toOrganization(OrganizationRequestDTO organizationRequestDTO) {
         if (organizationRequestDTO == null) return null;
+
         Organization organization = new Organization();
+
         organization.setName(organizationRequestDTO.getName());
-        organization.setCoordinates(organizationRequestDTO.getCoordinates());
-        organization.setOfficialAddress(organizationRequestDTO.getOfficialAddress());
+
+        // ИСПРАВЛЕНИЕ 1: Используем toCoordinates(CoordinatesRequestDTO) для преобразования
+        organization.setCoordinates(toCoordinates(organizationRequestDTO.getCoordinates())); // <--- ИСПРАВЛЕНО
+
+        // ИСПРАВЛЕНИЕ 2: Используем toAddress(AddressRequestDTO) для преобразования
+        organization.setOfficialAddress(toAddress(organizationRequestDTO.getOfficialAddress())); // <--- ИСПРАВЛЕНО
+
         organization.setAnnualTurnover(organizationRequestDTO.getAnnualTurnover());
         organization.setEmployeesCount(organizationRequestDTO.getEmployeesCount());
         organization.setRating(organizationRequestDTO.getRating());
         organization.setFullName(organizationRequestDTO.getFullName());
         organization.setType(organizationRequestDTO.getType());
-        organization.setPostalAddress(organizationRequestDTO.getPostalAddress());
+
+        // ИСПРАВЛЕНИЕ 3: Используем toAddress(AddressRequestDTO) для преобразования
+        organization.setPostalAddress(toAddress(organizationRequestDTO.getPostalAddress())); // <--- ИСПРАВЛЕНО
+
         return organization;
     }
+
+
 
     public static Address toAddress(AddressRequestDTO postalAddress) {
         if (postalAddress == null) return null;

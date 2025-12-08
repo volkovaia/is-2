@@ -57,34 +57,34 @@ public class SpecialOperationsView implements Serializable {
         countResult = organizationService.countByTypeLessThan(dto);
     }
 
-    public void mergeOrganizations() {
-        OrganizationMergeRequestDTO request = new OrganizationMergeRequestDTO();
-        request.setOrgId1(mergeOrgId1);
-        request.setOrgId2(mergeOrgId2);
-        request.setNewName(mergeNewName);
-
-        // Создаём Address из AddressRequestDTO
-        Address newAddress = new Address();
-        newAddress.setStreet(mergeNewStreet);
-        newAddress.setZipCode(mergeNewZipCode);
-        request.setNewAddress(newAddress); // ← теперь тип совпадает!
-
-        mergeResult = organizationService.mergeOrganizations(request);
-    }
-
 //    public void mergeOrganizations() {
 //        OrganizationMergeRequestDTO request = new OrganizationMergeRequestDTO();
 //        request.setOrgId1(mergeOrgId1);
 //        request.setOrgId2(mergeOrgId2);
 //        request.setNewName(mergeNewName);
 //
-//        AddressRequestDTO newAddress = new AddressRequestDTO();
+//        // Создаём Address из AddressRequestDTO
+//        Address newAddress = new Address();
 //        newAddress.setStreet(mergeNewStreet);
 //        newAddress.setZipCode(mergeNewZipCode);
-//        request.setNewAddress(newAddress);
+//        request.setNewAddress(newAddress); // ← теперь тип совпадает!
 //
 //        mergeResult = organizationService.mergeOrganizations(request);
 //    }
+
+    public void mergeOrganizations() {
+        OrganizationMergeRequestDTO request = new OrganizationMergeRequestDTO();
+        request.setOrgId1(mergeOrgId1);
+        request.setOrgId2(mergeOrgId2);
+        request.setNewName(mergeNewName);
+
+        AddressRequestDTO newAddress = new AddressRequestDTO();
+        newAddress.setStreet(mergeNewStreet);
+        newAddress.setZipCode(mergeNewZipCode);
+        request.setNewAddress(newAddress);
+
+        mergeResult = organizationService.mergeOrganizations(request);
+    }
 
     public void absorbOrganization() {
         OrganizationAbsorbRequestDTO request = new OrganizationAbsorbRequestDTO();

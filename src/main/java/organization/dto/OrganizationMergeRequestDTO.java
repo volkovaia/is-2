@@ -16,5 +16,5 @@ public class OrganizationMergeRequestDTO {
 
     private String newName;
 
-    private Address newAddress;
+    private AddressRequestDTO newAddress;
 }

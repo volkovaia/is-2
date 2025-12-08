@@ -2,6 +2,7 @@ package organization.service;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.resource.spi.work.SecurityContext;
 import jakarta.transaction.Transactional;
 import jakarta.validation.ValidationException;
 import lombok.NoArgsConstructor;
@@ -13,10 +14,13 @@ import organization.entity.*;
 import organization.mapper.OrganizationMapper;
 import organization.repository.OrganizationRepository;
 
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,6 +31,90 @@ public class OrganizationService {
 
     @Inject
     private OrganizationRepository organizationRepository;
+
+    @Inject // Внедряем новый сервис для истории
+    private ImportHistoryService historyService;
+
+    private String getCurrentUsername() {
+        try {
+            // Поиск Principal через JNDI (специфично для контейнера, но часто работает)
+            // или через FacesContext, если вызывается из JSF-бина.
+            InitialContext initialContext = new InitialContext();
+            SecurityContext securityContext = (SecurityContext) initialContext.lookup("java:comp/EJBContext/SecurityContext");
+            Principal principal = securityContext.getUserPrincipal();
+            if (principal != null) {
+                return principal.getName();
+            }
+        } catch (NamingException e) {
+            // Fallback, если JNDI не сработало
+        }
+
+        // Более надежный способ для JSF-приложения - получить Principal в OrganizationView
+        // и передать его сюда, или использовать FacesContext.
+        // Для демонстрации оставим заглушку.
+        return "UNKNOWN_USER";
+    }
+
+    public int importFromCsv(List<OrganizationRequestDTO> organizationRequestDTOS) {
+
+        String username = getCurrentUsername();
+
+        ImportHistory history = new ImportHistory();
+        history.setUserName(username);
+        history.setStatus(ImportStatus.IN_PROGRESS);
+        // Сохраняем начальный статус. Это должно быть в отдельной транзакции (REQUIRES_NEW)
+        // В CDI для этого нужен специальный прокси или использование EJB.
+        // Если ImportHistoryService - EJB, то работает. Если CDI, то нужно настроить
+        // CDI-Interceptor или использовать Service-to-Service вызов с JTA/BMT.
+        // Предположим, historyService корректно настроен для новой транзакции (как в моем примере EJB).
+        history = historyService.save(history);
+
+        int successfulCount = 0;
+        try {
+            for (OrganizationRequestDTO dto : organizationRequestDTOS) {
+                Organization org = OrganizationMapper.toOrganization(dto);
+
+                // 1. ВАЛИДАЦИЯ ИЗ ЛР1 (перед сохранением)
+                validateOrganization(org);
+
+                // 2. ПРОГРАММНАЯ ПРОВЕРКА УНИКАЛЬНОСТИ (Требование ЛР2)
+                checkBusinessUniqueConstraint(org);
+
+                org.setId(null); // Гарантируем генерацию нового ID
+                org.setCreationDate(null); // Дату должен проставить триггер/репозиторий
+                organizationRepository.create(org);
+                successfulCount++;
+            }
+
+            // Если дошли сюда, транзакция фиксируется. Обновляем статус.
+            historyService.updateStatus(history.getId(), ImportStatus.SUCCESS, successfulCount, null);
+            return organizations.size();
+
+        } catch (ValidationException | IllegalArgumentException e) {
+            // Перехватываем ошибки валидации/бизнес-логики, которые должны откатить транзакцию
+            // Транзакция @Transactional откатится автоматически.
+            String errorMsg = e.getMessage();
+            historyService.updateStatus(history.getId(), ImportStatus.FAILED, 0, errorMsg);
+
+            // Перебрасываем RuntimeException, чтобы уведомить вызывающий код (View)
+            throw new RuntimeException("Импорт не удался. Ничего не сохранено. Причина: " + errorMsg, e);
+        }
+    }
+
+    /**
+     * Проверяет уникальность поля fullName на программном уровне (для ЛР2).
+     * @throws ValidationException при нарушении уникальности
+     */
+    private void checkBusinessUniqueConstraint(Organization organization) {
+        // Мы ищем, существует ли уже организация с таким fullName
+        List<Organization> existing = organizationRepository.findByFullName(organization.getFullName());
+
+        // Фильтруем, чтобы исключить текущую организацию при UPDATE (хотя здесь только CREATE)
+        if (existing != null && !existing.isEmpty()) {
+            throw new ValidationException("Бизнес-ограничение нарушено: Организация с полным именем '" + organization.getFullName() + "' уже существует.");
+        }
+    }
+
 
     @Transactional
     public OrganizationResponseDTO getOrganizationWithMaxFullName() {

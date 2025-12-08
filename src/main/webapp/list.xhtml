@@ -604,6 +604,58 @@
         </div>
     </div>
 
+    <!-- НОВЫЙ БЛОК: ИСТОРИЯ ИМПОРТА -->
+    <h3>История операций импорта</h3>
+    <h:form id="historyForm">
+        <p:dataTable value="#{organizationView.importHistoryList}"
+                     var="history"
+                     id="historyTable"
+                     paginator="true"
+                     rows="10"
+                     rowsPerPageTemplate="5,10,15"
+                     paginatorPosition="bottom"
+                     styleClass="table"
+                     emptyMessage="Нет истории для отображения">
+
+            <f:attribute name="loadListener" value="#{organizationView.loadImportHistory}" />
+
+            <p:column headerText="ID" style="width: 50px;">
+                #{history.id}
+            </p:column>
+            <p:column headerText="Пользователь" style="width: 150px;">
+                #{history.userName}
+            </p:column>
+            <p:column headerText="Статус" style="width: 80px;">
+                <h:outputText value="#{history.status}" style="font-weight: bold; color: #{history.status == 'SUCCESS' ? 'green' : (history.status == 'FAILED' ? 'red' : 'blue')};"/>
+            </p:column>
+            <p:column headerText="Объектов (Success)" style="width: 100px;">
+                #{history.objectCount != null ? history.objectCount : 'N/A'}
+            </p:column>
+            <p:column headerText="Начало" style="width: 180px;">
+                <h:outputText value="#{history.startDate}">
+                    <f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" />
+                </h:outputText>
+            </p:column>
+            <p:column headerText="Конец" style="width: 180px;">
+                <h:outputText value="#{history.endDate}">
+                    <f:convertDateTime pattern="yyyy-MM-dd HH:mm:ss" />
+                </h:outputText>
+            </p:column>
+            <p:column headerText="Сообщение об ошибке" rendered="#{history.status == 'FAILED'}">
+                <p:outputPanel rendered="#{history.errorMessage != null}">
+                    <h:outputText value="#{history.errorMessage}" style="color: red;"/>
+                </p:outputPanel>
+            </p:column>
+        </p:dataTable>
+        <!-- Кнопка обновления истории -->
+        <h:commandButton value="Обновить историю" action="#{organizationView.loadImportHistory}">
+            <f:ajax execute="@this" render="historyTable" />
+        </h:commandButton>
+        <!-- Автообновление (опционально, можно убрать) -->
+        <p:poll interval="10" listener="#{organizationView.loadImportHistory}" update="historyTable" />
+    </h:form>
+
+
     <script>
         function openModal(modalId) {
             document.getElementById(modalId).style.display = 'block';

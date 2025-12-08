@@ -2,10 +2,12 @@ package organization.view;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.faces.application.FacesMessage;
+import jakarta.faces.context.ExternalContext;
 import jakarta.faces.context.FacesContext;
 import jakarta.faces.view.ViewScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -85,6 +87,12 @@ public class OrganizationView implements Serializable {
     private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
     private final Validator validator = factory.getValidator();
 
+    @Inject // Или @EJB
+    private ImportHistoryService historyService; // Новый сервис
+
+    // Поля для отображения истории
+    private List<ImportHistory> importHistoryList;
+
     public <T> Set<ConstraintViolation<T>> validateDto(T dto) {
         return validator.validate(dto);
     }
@@ -126,6 +134,7 @@ public class OrganizationView implements Serializable {
             return;
         }
 
+
         if (!errors.isEmpty()) {
             errors.forEach(this::addErrorMessage);
             addErrorMessage("Импорт отменён из-за ошибок парсинга");
@@ -149,6 +158,23 @@ public class OrganizationView implements Serializable {
 
         // Очистка
         this.uploadedFile = null;
+    }
+
+    public void loadImportHistory() {
+        ExternalContext externalContext = FacesContext.getCurrentInstance().getExternalContext();
+        HttpServletRequest request = (HttpServletRequest) externalContext.getRequest();
+
+        String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "ANONYMOUS";
+        boolean isAdmin = request.isUserInRole("ADMIN"); // Замените "ADMIN" на вашу роль администратора
+
+        this.importHistoryList = historyService.findHistoryByUser(username, isAdmin);
+    }
+
+    public List<ImportHistory> getImportHistoryList() {
+        if (this.importHistoryList == null) {
+            loadImportHistory();
+        }
+        return importHistoryList;
     }
 
 

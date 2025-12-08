@@ -145,6 +145,21 @@ public class OrganizationRepository {
                 .getSingleResult();
     }
 
+    public List<Organization> findByFullName(String fullName) {
+        // JPQL: SELECT o FROM Organization o WHERE o.fullName = :fullName
+
+        // Создаем TypedQuery для безопасного возвращаемого типа
+        TypedQuery<Organization> query = em.createQuery(
+                "SELECT o FROM Organization o WHERE o.fullName = :fullName",
+                Organization.class);
+
+        // Устанавливаем параметр
+        query.setParameter("fullName", fullName);
+
+        // Возвращаем результат
+        return query.getResultList();
+    }
+
     public List<Organization> findAll() {
         TypedQuery<Organization> query = em.createQuery(
                 "SELECT o FROM Organization o", Organization.class);

@@ -153,6 +153,7 @@ public class OrganizationService {
         // 1. ПРЕОБРАЗОВАНИЕ DTO -> ENTITY
         Address newPostalAddress = OrganizationMapper.toAddress(dto.getNewAddress());
 
+
         org1.setName(dto.getNewName());
         org1.setFullName(dto.getNewName());
 

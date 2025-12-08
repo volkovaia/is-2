@@ -78,7 +78,6 @@ public class OrganizationView implements Serializable {
     private Long absorbOrgId1;
     private Long absorbOrgId2;
 
-    // Поле для загрузки файла (оставлено, хотя не используется напрямую, т.к. PrimeFaces использует event)
     private UploadedFile uploadedFile;
 
     // === Методы DTO/Валидации ===
@@ -92,7 +91,7 @@ public class OrganizationView implements Serializable {
     @PostConstruct
     public void init() {
         loadAll();
-        loadImportHistory(); // Загружаем историю при инициализации
+        loadImportHistory();
     }
 
     public void loadAll() {
@@ -100,16 +99,12 @@ public class OrganizationView implements Serializable {
         if (allOrganizations == null) {
             allOrganizations = new ArrayList<>(organizationsDTO);
         } else {
-            // Обновление allOrganizations для фильтрации
             allOrganizations = new ArrayList<>(organizationsDTO);
         }
     }
 
     // === Методы для импорта CSV ===
 
-    /**
-     * Обработчик события загрузки файла. Парсит CSV и вызывает сервис.
-     */
     @SuppressWarnings("MagicConstant")
     public void handleFileUpload(FileUploadEvent event) {
         UploadedFile uploadedFile = event.getFile();
@@ -120,7 +115,6 @@ public class OrganizationView implements Serializable {
 
         List<OrganizationRequestDTO> parsedOrganizations = new ArrayList<>();
         List<String> errors = new ArrayList<>();
-        // Номер строки, начиная с 1 для заголовка
         int headerLineNumber = 1;
 
         try (
@@ -128,19 +122,17 @@ public class OrganizationView implements Serializable {
                 CSVParser parser = CSVFormat.DEFAULT
                         .withHeader("name", "fullName", "type", "annualTurnover", "employeesCount", "rating",
                                 "coordinates.x", "coordinates.y", "officialAddress.street", "officialAddress.zipCode",
-                                "postalAddress.street", "postalAddress.zipCode") // Заголовки
-                        .withSkipHeaderRecord() // Пропускаем строку с заголовками
+                                "postalAddress.street", "postalAddress.zipCode")
+                        .withSkipHeaderRecord()
                         .withIgnoreEmptyLines()
                         .withTrim()
                         .parse(new InputStreamReader(is, StandardCharsets.UTF_8))
         ) {
             for (CSVRecord record : parser) {
-                // Номер строки данных (2, 3, 4...)
                 int dataLineNumber = (int) record.getRecordNumber() + headerLineNumber;
                 try {
                     OrganizationRequestDTO dto = parseCsvRecord(record);
 
-                    // 1. Дополнительная валидация DTO перед добавлением в список
                     Set<ConstraintViolation<OrganizationRequestDTO>> violations = validateDto(dto);
                     if (!violations.isEmpty()) {
                         String violationMsg = violations.stream()
@@ -180,24 +172,18 @@ public class OrganizationView implements Serializable {
             loadAll();
             loadImportHistory();
         } catch (RuntimeException e) {
-            // Перехватываем RuntimeException, выброшенный сервисом (с откатом транзакции)
             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
             addErrorMessage("Импорт отменён (ошибка транзакции): " + msg, null);
-            loadImportHistory(); // Обновляем историю, чтобы показать FAILED статус
+            loadImportHistory();
         }
     }
 
-    /**
-     * Парсит CSVRecord (из Apache Commons CSV) в OrganizationRequestDTO.
-     * @throws RuntimeException при ошибке парсинга
-     */
     private OrganizationRequestDTO parseCsvRecord(CSVRecord record) {
         try {
             // Вспомогательная функция для получения Trimmed/Cleaned String
             java.util.function.Function<String, String> getCleaned = (fieldName) ->
                     record.get(fieldName).trim().replace("\"", "");
 
-            // 1. Обработка числовых полей с учетом пустых строк (0.0 для double/float, 0 для int)
             String annualTurnoverStr = getCleaned.apply("annualTurnover");
             double annualTurnover = annualTurnoverStr.isEmpty() ? 0.0 : Double.parseDouble(annualTurnoverStr);
 
@@ -213,13 +199,13 @@ public class OrganizationView implements Serializable {
             String coordYStr = getCleaned.apply("coordinates.y");
             long coordY = coordYStr.isEmpty() ? 0L : Long.parseLong(coordYStr);
 
-            // 2. Координаты
+            // 2. Координаты (ИСПРАВЛЕНО: Используем CoordinatesRequestDTO)
             CoordinatesRequestDTO coordinates = CoordinatesRequestDTO.builder()
                     .x(coordX)
                     .y((int) coordY)
                     .build();
 
-            // 3. Адреса
+            // 3. Адреса (ИСПРАВЛЕНО: Используем AddressRequestDTO)
             String officialZipCode = getCleaned.apply("officialAddress.zipCode");
             AddressRequestDTO officialAddress = AddressRequestDTO.builder()
                     .street(getCleaned.apply("officialAddress.street"))
@@ -246,10 +232,8 @@ public class OrganizationView implements Serializable {
                     .build();
 
         } catch (IllegalArgumentException e) {
-            // Бросаем RuntimeException, чтобы не объявлять throws Exception
             throw new RuntimeException("Ошибка преобразования типов данных (числа/ENUM): " + e.getMessage(), e);
         } catch (Exception e) {
-            // Бросаем RuntimeException
             throw new RuntimeException("Ошибка парсинга поля: " + e.getMessage(), e);
         }
     }
@@ -257,16 +241,12 @@ public class OrganizationView implements Serializable {
 
     // === Методы истории импорта ===
 
-    /**
-     * Загружает список истории импорта, фильтруя по пользователю и роли.
-     */
     public void loadImportHistory() {
         ExternalContext externalContext = FacesContext.getCurrentInstance().getExternalContext();
         HttpServletRequest request = (HttpServletRequest) externalContext.getRequest();
 
-        // Получение имени пользователя и роли
         String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "ANONYMOUS";
-        boolean isAdmin = request.isUserInRole("ADMIN"); // Замените "ADMIN" на вашу роль администратора
+        boolean isAdmin = request.isUserInRole("ADMIN");
 
         try {
             this.importHistoryList = historyService.findHistoryByUser(username, isAdmin);
@@ -274,6 +254,31 @@ public class OrganizationView implements Serializable {
             addErrorMessage("Ошибка загрузки истории импорта: " + e.getMessage(), e);
             this.importHistoryList = new ArrayList<>();
         }
+    }
+
+    public List<ImportHistory> getImportHistoryList() {
+        if (this.importHistoryList == null) {
+            loadImportHistory();
+        }
+        return importHistoryList;
+    }
+
+    // === Вспомогательные методы сообщений ===
+
+    private void addInfoMessage(String message, Throwable cause) {
+        FacesContext.getCurrentInstance().addMessage(null,
+                new FacesMessage(FacesMessage.SEVERITY_INFO, "Успех", message));
+        if (cause != null) cause.printStackTrace();
+    }
+    private void addErrorMessage(String message, Throwable cause) {
+        FacesContext.getCurrentInstance().addMessage(null,
+                new FacesMessage(FacesMessage.SEVERITY_ERROR, "Ошибка", message));
+        if (cause != null) cause.printStackTrace();
+    }
+    private void addWarnMessage(String message, Throwable cause) {
+        FacesContext.getCurrentInstance().addMessage(null,
+                new FacesMessage(FacesMessage.SEVERITY_WARN, "Предупреждение", message));
+        if (cause != null) cause.printStackTrace();
     }
 
     // --- Методы, оставленные без изменений ---
@@ -332,7 +337,6 @@ public class OrganizationView implements Serializable {
     public void prepareNewOrganization() {
         resetSelectedOrganization();
         this.newOrganizationDTO = new OrganizationRequestDTO();
-        // ИСПРАВЛЕНО: Используем RequestDTO классы
         this.newOrganizationDTO.setCoordinates(new CoordinatesRequestDTO());
         this.newOrganizationDTO.setOfficialAddress(new AddressRequestDTO());
         this.newOrganizationDTO.setPostalAddress(new AddressRequestDTO());
@@ -394,31 +398,5 @@ public class OrganizationView implements Serializable {
         req.setOrgId2(absorbOrgId2);
         absorbResult = organizationService.absorbOrganization(req);
         loadAll(); // обновить список
-    }
-
-    // --- Геттеры и Сеттеры, где не Data Lombok ---
-    public List<ImportHistory> getImportHistoryList() {
-        if (this.importHistoryList == null) {
-            loadImportHistory();
-        }
-        return importHistoryList;
-    }
-
-    // === Вспомогательные методы сообщений ===
-
-    private void addInfoMessage(String message, Throwable cause) {
-        FacesContext.getCurrentInstance().addMessage(null,
-                new FacesMessage(FacesMessage.SEVERITY_INFO, "Успех", message));
-        if (cause != null) cause.printStackTrace();
-    }
-    private void addErrorMessage(String message, Throwable cause) {
-        FacesContext.getCurrentInstance().addMessage(null,
-                new FacesMessage(FacesMessage.SEVERITY_ERROR, "Ошибка", message));
-        if (cause != null) cause.printStackTrace();
-    }
-    private void addWarnMessage(String message, Throwable cause) {
-        FacesContext.getCurrentInstance().addMessage(null,
-                new FacesMessage(FacesMessage.SEVERITY_WARN, "Предупреждение", message));
-        if (cause != null) cause.printStackTrace();
     }
 }

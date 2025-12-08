@@ -85,28 +85,18 @@
 
     <!-- Импорт CSV -->
     <h3>Массовый импорт организаций</h3>
+
     <h:form enctype="multipart/form-data">
-        <!-- ИСПРАВЛЕНИЕ: auto="false", чтобы загрузка происходила явно (по кнопке "Загрузить") -->
-        <!-- Добавлено update, чтобы обновить форму и избежать потери состояния бина -->
         <p:fileUpload id="csvUploader"
                       fileUploadListener="#{organizationView.handleFileUpload}"
                       mode="advanced"
                       skinSimple="true"
                       allowTypes="/(\.|\/)(csv)$/i"
-                      label="Выберите CSV-файл"
-                      uploadLabel="Загрузить"
+                      label="Выберите CSV-файл и начнется импорт"
                       cancelLabel="Отмена"
-                      auto="false"
-                      update="importMessages" />  <!-- Важно: обновляем только сообщения после handleFileUpload -->
+                      auto="true"
+                      update="@form, :mainForm" /> <!-- Добавил обновление mainForm -->
 
-        <!-- ИСПРАВЛЕНИЕ: Используем p:commandButton для лучшей интеграции с PrimeFaces AJAX -->
-        <p:commandButton value="Импортировать"
-                         action="#{organizationView.importCsv}"
-                         update=":mainForm:mainDataTable importMessages"
-                         onstart="PF('statusDialog').show();"
-                         oncomplete="PF('statusDialog').hide();" />
-
-        <!-- Перемещаем p:messages и p:dialog внутрь h:form для корректной работы AJAX-обновления -->
         <p:dialog widgetVar="statusDialog" modal="true" draggable="false" closable="false"
                   header="Импорт..." resizable="false">
             <p:progressBar mode="indeterminate" style="width:300px" />
@@ -114,8 +104,6 @@
 
         <p:messages id="importMessages" autoUpdate="true" showDetail="true" />
     </h:form>
-
-    <!-- УДАЛЕНЫ дубликаты p:dialog и p:messages, которые находились здесь -->
 
     <!-- МОДАЛЬНОЙ ОКНО ПОДРОБНОСТЕЙ ОБ ОРГАНИЗАЦИИ -->
     <h:panelGroup id="modalPanel">
@@ -163,7 +151,7 @@
 
             <div class="modal-content">
                 <h:commandLink action="#{organizationView.resetAllParams}">
-                    <f:ajax render="modalChangeInfo" />
+                    <f:ajax render="modalPanelChangeInfo" />
                     <span class="close" onclick="hideModalChangeInfo()">&#215;</span>
                 </h:commandLink>
                 <h2>Изменение информации об организации</h2>
@@ -411,15 +399,11 @@
                         <h:commandButton value="Отмена" action="#{organizationView.resetAllParams}">
                             <f:ajax render="modalAddPanel" />
                         </h:commandButton>
-
-                        <!--                        <button type="button" onclick="closeAddModal()">Отмена</button>-->
                     </div>
                 </h:form>
             </div>
         </div>
     </h:panelGroup>
-
-
 
     <!-- МОДАЛКА ФУЛНЭЙМА -->
     <h:panelGroup id="maxFullNamePanel">

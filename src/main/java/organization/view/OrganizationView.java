@@ -42,6 +42,9 @@ import java.util.stream.Collectors;
 @ViewScoped
 public class OrganizationView implements Serializable {
 
+//    private final transient ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+//    private final transient Validator validator = factory.getValidator();
+
     @Inject
     private OrganizationService organizationService;
 
@@ -77,10 +80,6 @@ public class OrganizationView implements Serializable {
     private Long absorbOrgId1;
     private Long absorbOrgId2;
 
-
-
-    // ... другие поля
-
     private UploadedFile uploadedFile;
 
     private final ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
@@ -92,55 +91,9 @@ public class OrganizationView implements Serializable {
 
     public void handleFileUpload(FileUploadEvent event) {
         this.uploadedFile = event.getFile();
-        System.out.println("Файл получен: " + uploadedFile.getFileName());
-    }
+        System.out.println("Файл получен и начинается обработка: " + uploadedFile.getFileName());
 
-    public void setUploadedFile(UploadedFile uploadedFile) {
-        this.uploadedFile = uploadedFile;
-    }
-//    public void importCsv() {
-//
-//        if (uploadedFile == null) {
-//            FacesContext.getCurrentInstance().addMessage(null,
-//                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Ошибка", "Файл не выбран"));
-//            return;
-//        }
-//
-//        try (InputStream is = uploadedFile.getInputStream()) {
-//            int count = organizationService.importFromCsv(is);
-//            FacesContext.getCurrentInstance().addMessage(null,
-//                    new FacesMessage(FacesMessage.SEVERITY_INFO, "Success", "Imported " + count + " organizations"));
-//            loadAll();
-//        } catch (Exception e) {
-//            FacesContext.getCurrentInstance().addMessage(null,
-//                    new FacesMessage(FacesMessage.SEVERITY_ERROR, "Import error", e.getMessage()));
-//            e.printStackTrace();
-//        } finally {
-//            // Опционально: очистить для повторной загрузки
-//            this.uploadedFile = null;
-//        }
-//    }
-
-    public void addInfoMessage(String message) {
-        System.out.println("[INFO] " + message);
-    }
-
-    // Метод для вывода сообщений об ошибках
-    public void addErrorMessage(String message) {
-        System.err.println("[ERROR] " + message);
-    }
-
-    public void addWarnMessage(String message) {
-        System.err.println("[WARN] " + message);
-    }
-    public void importCsv() {
-        System.out.println("=== importCsv() STARTED ===");
-
-        if (uploadedFile == null) {
-            addErrorMessage("File not selected");
-            return;
-        }
-
+        // Переносим всю логику импорта из importCsv() сюда
         List<OrganizationRequestDTO> parsedOrganizations = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
@@ -155,12 +108,12 @@ public class OrganizationView implements Serializable {
             }
 
             String line;
-            int lineNumber = 1; // первая строка данных — №2 в файле, но будем нумеровать с 1
+            int lineNumber = 1;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
                 try {
-                    OrganizationRequestDTO dto = parseCsvLine(line);
-                    validateDto(dto); // ← ваша валидация по ЛР1
+                    OrganizationRequestDTO dto = parseCsvLine(line); // Используем ИСПРАВЛЕННЫЙ метод
+                    validateDto(dto);
                     parsedOrganizations.add(dto);
                 } catch (Exception e) {
                     errors.add("Строка " + lineNumber + ": " + e.getMessage());
@@ -173,10 +126,9 @@ public class OrganizationView implements Serializable {
             return;
         }
 
-        // Если есть ошибки — не импортируем, только сообщаем
         if (!errors.isEmpty()) {
             errors.forEach(this::addErrorMessage);
-            addErrorMessage("Импорт отменён из-за ошибок");
+            addErrorMessage("Импорт отменён из-за ошибок парсинга");
             return;
         }
 
@@ -185,7 +137,6 @@ public class OrganizationView implements Serializable {
             return;
         }
 
-        // ✅ Теперь — единая транзакция
         try {
             int importedCount = organizationService.importFromCsv(parsedOrganizations);
             addInfoMessage("Успешно импортировано " + importedCount + " организаций");
@@ -195,17 +146,168 @@ public class OrganizationView implements Serializable {
             addErrorMessage("Ошибка импорта (транзакция отменена): " + (msg != null ? msg : "неизвестная ошибка"));
             e.printStackTrace();
         }
+
+        // Очистка
+        this.uploadedFile = null;
     }
 
+
+    public void setUploadedFile(UploadedFile uploadedFile) {
+        this.uploadedFile = uploadedFile;
+    }
+
+
+    public void addInfoMessage(String message) {
+        System.out.println("[INFO] " + message);
+    }
+
+    // Метод для вывода сообщений об ошибках
+    public void addErrorMessage(String message) {
+        System.err.println("[ERROR] " + message);
+    }
+
+    public void addWarnMessage(String message) {
+        System.err.println("[WARN] " + message);
+    }
+//    public void importCsv() {
+//        System.out.println("=== importCsv() STARTED ===");
+//
+//        if (uploadedFile == null) {
+//            addErrorMessage("File not selected");
+//            return;
+//        }
+//
+//        List<OrganizationRequestDTO> parsedOrganizations = new ArrayList<>();
+//        List<String> errors = new ArrayList<>();
+//
+//        try (InputStream is = uploadedFile.getInputStream();
+//             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+//
+//            // Пропускаем заголовок
+//            String headerLine = reader.readLine();
+//            if (headerLine == null) {
+//                addErrorMessage("CSV пуст");
+//                return;
+//            }
+//
+//            String line;
+//            int lineNumber = 1; // первая строка данных — №2 в файле, но будем нумеровать с 1
+//            while ((line = reader.readLine()) != null) {
+//                lineNumber++;
+//                try {
+//                    OrganizationRequestDTO dto = parseCsvLine(line);
+//                    validateDto(dto); // ← ваша валидация по ЛР1
+//                    parsedOrganizations.add(dto);
+//                } catch (Exception e) {
+//                    errors.add("Строка " + lineNumber + ": " + e.getMessage());
+//                }
+//            }
+//
+//        } catch (Exception e) {
+//            addErrorMessage("Ошибка чтения файла: " + e.getMessage());
+//            e.printStackTrace();
+//            return;
+//        }
+//
+//        // Если есть ошибки — не импортируем, только сообщаем
+//        if (!errors.isEmpty()) {
+//            errors.forEach(this::addErrorMessage);
+//            addErrorMessage("Импорт отменён из-за ошибок");
+//            return;
+//        }
+//
+//        if (parsedOrganizations.isEmpty()) {
+//            addWarnMessage("Нет данных для импорта");
+//            return;
+//        }
+//
+//        // ✅ Теперь — единая транзакция
+//        try {
+//            int importedCount = organizationService.importFromCsv(parsedOrganizations);
+//            addInfoMessage("Успешно импортировано " + importedCount + " организаций");
+//            loadAll();
+//        } catch (Exception e) {
+//            String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+//            addErrorMessage("Ошибка импорта (транзакция отменена): " + (msg != null ? msg : "неизвестная ошибка"));
+//            e.printStackTrace();
+//        }
+//    }
+//
+//    public OrganizationRequestDTO parseCsvLine(String line) throws Exception {
+//        String[] parts = line.split(","); // Разделитель - запятая
+//
+//        // ОЖИДАЕТСЯ 12 ПОЛЕЙ!
+//        if (parts.length < 12) {
+//            throw new IllegalArgumentException("Неверное количество полей в строке CSV. Ожидается 12.");
+//        }
+//
+//        try {
+//            String name = parts[0].trim().replace("\"", "");
+//            String fullName = parts[1].trim().replace("\"", "");
+//            OrganizationType type = OrganizationType.valueOf(parts[2].trim().toUpperCase().replace("\"", ""));
+//
+//            // Обработка пустых строк для числовых полей
+//            double annualTurnover = parts[3].trim().isEmpty() ? 0.0 : Double.parseDouble(parts[3].trim().replace("\"", ""));
+//            int employeesCount = parts[4].trim().isEmpty() ? 0 : Integer.parseInt(parts[4].trim().replace("\"", ""));
+//            float rating = parts[5].trim().isEmpty() ? 0.0f : Float.parseFloat(parts[5].trim().replace("\"", ""));
+//            double coordX = parts[6].trim().isEmpty() ? 0.0 : Double.parseDouble(parts[6].trim().replace("\"", ""));
+//            long coordY = parts[7].trim().isEmpty() ? 0L : Long.parseLong(parts[7].trim().replace("\"", ""));
+//
+//            String officialStreet = parts[8].trim().replace("\"", "");
+//            String officialZipCode = parts[9].trim().replace("\"", ""); // Добавлено
+//            String postalStreet = parts[10].trim().replace("\"", "");
+//            String postalZipCode = parts[11].trim().replace("\"", ""); // Добавлено
+//
+//
+//            Coordinates coordinates = Coordinates.builder()
+//                    .x(coordX)
+//                    .y((int) coordY)
+//                    .build();
+//
+//            Address officialAddress = Address.builder()
+//                    .street(officialStreet)
+//                    .zipCode(officialZipCode.isEmpty() ? null : officialZipCode) // Учитываем пустое значение
+//                    .build();
+//
+//            Address postalAddress = Address.builder()
+//                    .street(postalStreet)
+//                    .zipCode(postalZipCode.isEmpty() ? null : postalZipCode) // Учитываем пустое значение
+//                    .build();
+//
+//
+//            return OrganizationRequestDTO.builder()
+//                    .name(name)
+//                    .coordinates(coordinates)
+//                    .officialAddress(officialAddress)
+//                    .annualTurnover(annualTurnover)
+//                    .employeesCount(employeesCount)
+//                    .rating(rating)
+//                    .fullName(fullName)
+//                    .type(type)
+//                    .postalAddress(postalAddress)
+//                    .build();
+//
+//        } catch (Exception e) {
+//            throw new Exception("Ошибка парсинга строки CSV. Проверьте форматирование и типы данных: " + e.getMessage());
+//        }
+//    }
+
+    // МЕТОД importCsv() теперь не нужен, но его можно оставить пустым, чтобы не менять XHTML
+    public void importCsv() {
+        System.out.println("=== importCsv() STARTED (Ignored, logic moved to handleFileUpload) ===");
+        addWarnMessage("Нажмите 'Выберите CSV-файл', чтобы начать импорт.");
+    }
+
+    // ИСПРАВЛЕННЫЙ МЕТОД ПАРСИНГА - ВАЖНО!
     public OrganizationRequestDTO parseCsvLine(String line) throws Exception {
         String[] parts = line.split(","); // Разделитель - запятая
 
-        // ОЖИДАЕТСЯ 12 ПОЛЕЙ!
         if (parts.length < 12) {
             throw new IllegalArgumentException("Неверное количество полей в строке CSV. Ожидается 12.");
         }
 
         try {
+            // Убедитесь, что порядок полей в этом коде соответствует порядку в вашем CSV-файле
             String name = parts[0].trim().replace("\"", "");
             String fullName = parts[1].trim().replace("\"", "");
             OrganizationType type = OrganizationType.valueOf(parts[2].trim().toUpperCase().replace("\"", ""));
@@ -218,9 +320,9 @@ public class OrganizationView implements Serializable {
             long coordY = parts[7].trim().isEmpty() ? 0L : Long.parseLong(parts[7].trim().replace("\"", ""));
 
             String officialStreet = parts[8].trim().replace("\"", "");
-            String officialZipCode = parts[9].trim().replace("\"", ""); // Добавлено
+            String officialZipCode = parts[9].trim().replace("\"", "");
             String postalStreet = parts[10].trim().replace("\"", "");
-            String postalZipCode = parts[11].trim().replace("\"", ""); // Добавлено
+            String postalZipCode = parts[11].trim().replace("\"", "");
 
 
             Coordinates coordinates = Coordinates.builder()
@@ -230,12 +332,12 @@ public class OrganizationView implements Serializable {
 
             Address officialAddress = Address.builder()
                     .street(officialStreet)
-                    .zipCode(officialZipCode.isEmpty() ? null : officialZipCode) // Учитываем пустое значение
+                    .zipCode(officialZipCode.isEmpty() ? null : officialZipCode)
                     .build();
 
             Address postalAddress = Address.builder()
                     .street(postalStreet)
-                    .zipCode(postalZipCode.isEmpty() ? null : postalZipCode) // Учитываем пустое значение
+                    .zipCode(postalZipCode.isEmpty() ? null : postalZipCode)
                     .build();
 
 
@@ -252,9 +354,11 @@ public class OrganizationView implements Serializable {
                     .build();
 
         } catch (Exception e) {
-            throw new Exception("Ошибка парсинга строки CSV. Проверьте форматирование и типы данных: " + e.getMessage());
+            throw new Exception("Ошибка парсинга строки CSV. Проверьте форматирование, количество полей (должно быть 12) и типы данных: " + e.getMessage());
         }
     }
+
+
 
 
     @PostConstruct

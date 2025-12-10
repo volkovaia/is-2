@@ -256,18 +256,46 @@ public class OrganizationView implements Serializable {
             return;
         }
 
+        ExternalContext externalContext = FacesContext.getCurrentInstance().getExternalContext();
+        HttpServletRequest request = (HttpServletRequest) externalContext.getRequest();
+        // Используем "ADMIN", так как ранее мы установили это для обхода прав
+        String userName = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "ADMIN";
+
         // 4. Вызов сервиса для транзакционного импорта
+//        try {
+//            System.out.println("DEBUG: handleFileUpload - Calling service to import " + parsedOrganizations.size() + " organizations."); // ADDED
+//            int importedCount = organizationService.importFromCsv(parsedOrganizations);
+//            addInfoMessage("Успешно импортировано " + importedCount + " организаций.", null);
+//            loadAll();
+//            loadImportHistory();
+//            System.out.println("DEBUG: handleFileUpload - Import successful. Count: " + importedCount); // ADDED
+//        } catch (RuntimeException e) {
+//            String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+//            addErrorMessage("Импорт отменён (ошибка транзакции): " + msg, null);
+//            System.err.println("FATAL ERROR: handleFileUpload - Transactional import failed: " + msg); // ADDED
+//            e.printStackTrace();
+//            loadImportHistory();
+//        }
         try {
-            System.out.println("DEBUG: handleFileUpload - Calling service to import " + parsedOrganizations.size() + " organizations."); // ADDED
-            int importedCount = organizationService.importFromCsv(parsedOrganizations);
-            addInfoMessage("Успешно импортировано " + importedCount + " организаций.", null);
+            System.out.println("DEBUG: handleFileUpload - Calling service to import " + parsedOrganizations.size() + " organizations for user: " + userName);
+
+            // НОВЫЙ ВЫЗОВ: передаем имя пользователя, и сервис сам записывает историю
+            ImportHistory resultHistory = organizationService.importFromCsv(parsedOrganizations, userName);
+
+            if (ImportStatus.SUCCESS.equals(resultHistory.getStatus())) {
+                addInfoMessage("Успешно импортировано " + resultHistory.getObjectCount() + " организаций.", null);
+            } else {
+                addErrorMessage("Импорт завершен с ошибкой: " + resultHistory.getErrorMessage(), null);
+            }
+
             loadAll();
             loadImportHistory();
-            System.out.println("DEBUG: handleFileUpload - Import successful. Count: " + importedCount); // ADDED
+            System.out.println("DEBUG: handleFileUpload - Import processing complete.");
+
         } catch (RuntimeException e) {
             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-            addErrorMessage("Импорт отменён (ошибка транзакции): " + msg, null);
-            System.err.println("FATAL ERROR: handleFileUpload - Transactional import failed: " + msg); // ADDED
+            addErrorMessage("Импорт отменён (Критическая ошибка): " + msg, null);
+            System.err.println("FATAL ERROR: handleFileUpload - Transactional import failed: " + msg);
             e.printStackTrace();
             loadImportHistory();
         }

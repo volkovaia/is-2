@@ -15,6 +15,7 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import java.io.InputStream; // Не используется, но оставлен
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -50,49 +51,96 @@ public class OrganizationService {
     /**
      * Основной метод для импорта. Обеспечивает транзакцию "все или ничего" и логирование истории.
      */
-    @Transactional // <--- ЭТО ВАЖНО: Обеспечивает откат всей операции при ошибке
-    public int importFromCsv(List<OrganizationRequestDTO> organizationRequestDTOS) {
+//    @Transactional // <--- ЭТО ВАЖНО: Обеспечивает откат всей операции при ошибке
+//    public int importFromCsv(List<OrganizationRequestDTO> organizationRequestDTOS) {
+//
+//        String username = getCurrentUsername();
+//        System.out.println("userName: " + username);
+//        ImportHistory history = new ImportHistory();
+//        history.setUserName(username);
+//        history.setStatus(ImportStatus.IN_PROGRESS);
+//
+//        // 1. Сохраняем начальный статус в отдельной транзакции (ImportHistoryService должен быть EJB)
+//        history = historyService.save(history);
+//        System.out.println("history got");
+//        int successfulCount = 0;
+//        try {
+//            for (OrganizationRequestDTO dto : organizationRequestDTOS) {
+//                Organization org = OrganizationMapper.toOrganization(dto);
+//
+//                // 2. ВАЛИДАЦИЯ ИЗ ЛР1
+//                validateOrganization(org);
+//
+//                // 3. ПРОГРАММНАЯ ПРОВЕРКА УНИКАЛЬНОСТИ
+//                checkBusinessUniqueConstraint(org);
+//
+//                org.setId(null);
+//                org.setCreationDate(null);
+//                organizationRepository.create(org);
+//                successfulCount++;
+//                System.out.println("successful count: " + successfulCount);
+//            }
+//            System.out.println("finished with organizations");
+//            // Если дошли до конца цикла, фиксируем транзакцию и обновляем историю
+//            historyService.updateStatus(history.getId(), ImportStatus.SUCCESS, successfulCount, null);
+//            System.out.println("history status: success");
+//            return successfulCount;
+//
+//        } catch (ValidationException | IllegalArgumentException e) {
+//            // 4. ОШИБКА: Откат транзакции (автоматически из-за @Transactional)
+//            String errorMsg = e.getMessage();
+//            historyService.updateStatus(history.getId(), ImportStatus.FAILED, 0, errorMsg);
+//
+//            // Перебрасываем RuntimeException, чтобы контейнер выполнил Rollback и уведомил вызывающий код
+//            throw new RuntimeException("Импорт не удался. Ничего не сохранено. Причина: " + errorMsg, e);
+//        }
+//    }
 
-        String username = getCurrentUsername();
-        System.out.println("userName: " + username);
-        ImportHistory history = new ImportHistory();
-        history.setUserName(username);
-        history.setStatus(ImportStatus.IN_PROGRESS);
+    @Transactional // Убедитесь, что этот метод транзакционный (jakarta.transaction.Transactional)
+    public ImportHistory importFromCsv(List<OrganizationRequestDTO> organizations, String userName) { // Изменена сигнатура
+        // 1. Создание записи IN_PROGRESS
+        ImportHistory history = ImportHistory.builder()
+                .status(ImportStatus.IN_PROGRESS)
+                .userName(userName)
+                .build();
+        history = historyService.save(history); // Сохраняем начальный статус
 
-        // 1. Сохраняем начальный статус в отдельной транзакции (ImportHistoryService должен быть EJB)
-        history = historyService.save(history);
-        System.out.println("history got");
-        int successfulCount = 0;
+        int successCount = 0;
         try {
-            for (OrganizationRequestDTO dto : organizationRequestDTOS) {
-                Organization org = OrganizationMapper.toOrganization(dto);
+            System.out.println("LOG: OrganizationService - Начинается сохранение " + organizations.size() + " организаций.");
 
-                // 2. ВАЛИДАЦИЯ ИЗ ЛР1
-                validateOrganization(org);
+            for (OrganizationRequestDTO dto : organizations) {
 
-                // 3. ПРОГРАММНАЯ ПРОВЕРКА УНИКАЛЬНОСТИ
-                checkBusinessUniqueConstraint(org);
+                Organization entity = OrganizationMapper.toOrganization(dto);
+                organizationRepository.save(entity);
 
-                org.setId(null);
-                org.setCreationDate(null);
-                organizationRepository.create(org);
-                successfulCount++;
-                System.out.println("successful count: " + successfulCount);
+                successCount++;
             }
-            System.out.println("finished with organizations");
-            // Если дошли до конца цикла, фиксируем транзакцию и обновляем историю
-            historyService.updateStatus(history.getId(), ImportStatus.SUCCESS, successfulCount, null);
-            System.out.println("history status: success");
-            return successfulCount;
+            // 2. Успешное завершение
+            history.setStatus(ImportStatus.SUCCESS);
+            history.setObjectCount(successCount);
+            System.out.println("LOG: OrganizationService - Импорт успешно завершен. Объектов: " + successCount);
 
-        } catch (ValidationException | IllegalArgumentException e) {
-            // 4. ОШИБКА: Откат транзакции (автоматически из-за @Transactional)
-            String errorMsg = e.getMessage();
-            historyService.updateStatus(history.getId(), ImportStatus.FAILED, 0, errorMsg);
+        } catch (Exception e) {
+            // 3. Запись ошибки
+            System.err.println("FATAL ERROR: OrganizationService - Ошибка импорта: " + e.getMessage());
+            e.printStackTrace();
 
-            // Перебрасываем RuntimeException, чтобы контейнер выполнил Rollback и уведомил вызывающий код
-            throw new RuntimeException("Импорт не удался. Ничего не сохранено. Причина: " + errorMsg, e);
+            history.setStatus(ImportStatus.FAILED);
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "Неизвестная ошибка";
+            history.setErrorMessage(errorMsg.length() > 4000 ? errorMsg.substring(0, 4000) : errorMsg);
+
+            // Переброс исключения, чтобы откатить транзакцию (если @Transactional настроен правильно)
+            throw new RuntimeException("Ошибка сохранения организаций в БД", e);
+
+        } finally {
+            // 4. Обновление истории
+            history.setEndDate(LocalDateTime.now());
+            // ВАЖНО: Если у вас есть @Transactional, сохранение должно работать. Если нет,
+            // возможно, понадобится отдельный non-transactional метод для saveHistory.
+            historyService.save(history);
         }
+        return history;
     }
 
     /**

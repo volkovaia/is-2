@@ -42,6 +42,18 @@ public class OrganizationRepository {
 //        System.out.println(organization.getId());
 //    }
 
+    @Transactional(Transactional.TxType.SUPPORTS) // Делаем его частью транзакции сервиса
+    public Organization save(Organization organization) {
+        // Проверяем, существует ли Entity.
+        // Если ID == null, это новая сущность, используем persist.
+        if (organization.getId() == null) {
+            em.persist(organization);
+            return organization;
+        } else {
+            return em.merge(organization);
+        }
+    }
+
     public void delete(Organization organization) {
         if (organization == null) {
             return;

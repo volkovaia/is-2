@@ -1,6 +1,7 @@
 package organization.view;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.enterprise.context.SessionScoped;
 import jakarta.faces.application.FacesMessage;
 import jakarta.faces.context.ExternalContext;
 import jakarta.faces.context.FacesContext;
@@ -35,7 +36,8 @@ import java.util.stream.Collectors;
 
 @Data
 @Named
-@ViewScoped
+//@ViewScoped
+@SessionScoped
 public class OrganizationView implements Serializable {
 
     // === Зависимости ===
@@ -180,6 +182,7 @@ public class OrganizationView implements Serializable {
 //    }
 
     public void handleFileUpload(FileUploadEvent event) {
+        System.out.println("!!!!!!!!!! FILE UPLOAD START - RECEIVED EVENT !!!!!!!!!!!!");
         System.out.println("DEBUG: handleFileUpload - Start processing upload event."); // ENHANCED
         UploadedFile uploadedFile = event.getFile();
 

@@ -112,6 +112,12 @@ public class OrganizationService {
             for (OrganizationRequestDTO dto : organizations) {
 
                 Organization entity = OrganizationMapper.toOrganization(dto);
+
+                validateOrganization(entity);
+                checkBusinessUniqueConstraint(entity);
+
+                entity.setId(null);
+
                 organizationRepository.save(entity);
 
                 successCount++;

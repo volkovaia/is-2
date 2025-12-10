@@ -22,6 +22,8 @@ public class OrganizationRepository {
     @PersistenceContext(unitName = "organizationPU")
     private EntityManager em;
 
+
+    //тут был create
     public Organization create(Organization organization) {
         EntityTransaction transaction = em.getTransaction();
         try {
@@ -42,16 +44,21 @@ public class OrganizationRepository {
 //        System.out.println(organization.getId());
 //    }
 
-    @Transactional(Transactional.TxType.SUPPORTS) // Делаем его частью транзакции сервиса
+//    @Transactional(Transactional.TxType.SUPPORTS) // Делаем его частью транзакции сервиса
+//    public Organization save(Organization organization) {
+//        // Проверяем, существует ли Entity.
+//        // Если ID == null, это новая сущность, используем persist.
+//        if (organization.getId() == null) {
+//            em.persist(organization);
+//            return organization;
+//        } else {
+//            return em.merge(organization);
+//        }
+//    }
+
     public Organization save(Organization organization) {
-        // Проверяем, существует ли Entity.
-        // Если ID == null, это новая сущность, используем persist.
-        if (organization.getId() == null) {
-            em.persist(organization);
-            return organization;
-        } else {
-            return em.merge(organization);
-        }
+        em.persist(organization);
+        return organization;
     }
 
     public void delete(Organization organization) {

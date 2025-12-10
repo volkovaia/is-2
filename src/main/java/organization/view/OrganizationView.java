@@ -106,12 +106,90 @@ public class OrganizationView implements Serializable {
     // === Методы для импорта CSV ===
 
     @SuppressWarnings("MagicConstant")
+//    public void handleFileUpload(FileUploadEvent event) {
+//        System.out.println("hello from handleFileUpload OrganizationView");
+//        UploadedFile uploadedFile = event.getFile();
+//        if (uploadedFile == null) {
+//            addErrorMessage("Ошибка загрузки файла.", null);
+//            return;
+//        }
+//        System.out.println("got file from handleFileUpload OrganizationView");
+//        List<OrganizationRequestDTO> parsedOrganizations = new ArrayList<>();
+//        List<String> errors = new ArrayList<>();
+//        int headerLineNumber = 1;
+//
+//        try (
+//                InputStream is = uploadedFile.getInputStream();
+//                CSVParser parser = CSVFormat.DEFAULT
+//                        .withHeader("name", "fullName", "type", "annualTurnover", "employeesCount", "rating",
+//                                "coordinates.x", "coordinates.y", "officialAddress.street", "officialAddress.zipCode",
+//                                "postalAddress.street", "postalAddress.zipCode")
+//                        .withSkipHeaderRecord()
+//                        .withIgnoreEmptyLines()
+//                        .withTrim()
+//                        .parse(new InputStreamReader(is, StandardCharsets.UTF_8))
+//        ) {
+//            for (CSVRecord record : parser) {
+//                int dataLineNumber = (int) record.getRecordNumber() + headerLineNumber;
+//                try {
+//                    OrganizationRequestDTO dto = parseCsvRecord(record);
+//
+//                    Set<ConstraintViolation<OrganizationRequestDTO>> violations = validateDto(dto);
+//                    if (!violations.isEmpty()) {
+//                        String violationMsg = violations.stream()
+//                                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+//                                .collect(Collectors.joining("; "));
+//                        throw new RuntimeException("Валидация DTO не пройдена: " + violationMsg);
+//                    }
+//                    parsedOrganizations.add(dto);
+//                } catch (RuntimeException e) {
+//                    errors.add("Строка " + dataLineNumber + ": " + e.getMessage());
+//                }
+//            }
+//
+//        } catch (IOException e) {
+//            addErrorMessage("Ошибка чтения файла: " + e.getMessage(), e);
+//            return;
+//        } catch (Exception e) {
+//            addErrorMessage("Непредвиденная ошибка парсинга: " + e.getMessage(), e);
+//            return;
+//        }
+//
+//        if (!errors.isEmpty()) {
+//            errors.forEach(err -> addErrorMessage(err, null));
+//            addErrorMessage("Импорт отменён из-за ошибок парсинга данных в файле.", null);
+//            return;
+//        }
+//
+//        if (parsedOrganizations.isEmpty()) {
+//            addWarnMessage("Нет данных для импорта.", null);
+//            return;
+//        }
+//
+//        // 4. Вызов сервиса для транзакционного импорта
+//        try {
+//            int importedCount = organizationService.importFromCsv(parsedOrganizations);
+//            addInfoMessage("Успешно импортировано " + importedCount + " организаций.", null);
+//            loadAll();
+//            loadImportHistory();
+//        } catch (RuntimeException e) {
+//            String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+//            addErrorMessage("Импорт отменён (ошибка транзакции): " + msg, null);
+//            loadImportHistory();
+//        }
+//    }
+
     public void handleFileUpload(FileUploadEvent event) {
+        System.out.println("DEBUG: handleFileUpload - Start processing upload event."); // ENHANCED
         UploadedFile uploadedFile = event.getFile();
-        if (uploadedFile == null) {
+
+        if (uploadedFile == null || uploadedFile.getContent() == null || uploadedFile.getContent().length == 0) {
             addErrorMessage("Ошибка загрузки файла.", null);
+            System.err.println("ERROR: handleFileUpload - uploadedFile is null or empty. File name: " + (uploadedFile != null ? uploadedFile.getFileName() : "N/A")); // ADDED
             return;
         }
+
+        System.out.println("DEBUG: handleFileUpload - File received successfully. Name: " + uploadedFile.getFileName() + ", Size: " + uploadedFile.getSize()); // ENHANCED
 
         List<OrganizationRequestDTO> parsedOrganizations = new ArrayList<>();
         List<String> errors = new ArrayList<>();
@@ -119,6 +197,7 @@ public class OrganizationView implements Serializable {
 
         try (
                 InputStream is = uploadedFile.getInputStream();
+                InputStreamReader isr = new InputStreamReader(is, StandardCharsets.UTF_8); // Explicit InputStreamReader
                 CSVParser parser = CSVFormat.DEFAULT
                         .withHeader("name", "fullName", "type", "annualTurnover", "employeesCount", "rating",
                                 "coordinates.x", "coordinates.y", "officialAddress.street", "officialAddress.zipCode",
@@ -126,10 +205,13 @@ public class OrganizationView implements Serializable {
                         .withSkipHeaderRecord()
                         .withIgnoreEmptyLines()
                         .withTrim()
-                        .parse(new InputStreamReader(is, StandardCharsets.UTF_8))
+                        .parse(isr) // Use isr
         ) {
+            System.out.println("DEBUG: handleFileUpload - Starting CSV parsing loop. Header assumed to be skipped."); // ADDED
+
             for (CSVRecord record : parser) {
                 int dataLineNumber = (int) record.getRecordNumber() + headerLineNumber;
+                System.out.println("DEBUG: handleFileUpload - Processing record at line: " + dataLineNumber + ". Raw record: " + record); // ADDED
                 try {
                     OrganizationRequestDTO dto = parseCsvRecord(record);
 
@@ -138,45 +220,119 @@ public class OrganizationView implements Serializable {
                         String violationMsg = violations.stream()
                                 .map(v -> v.getPropertyPath() + ": " + v.getMessage())
                                 .collect(Collectors.joining("; "));
+                        System.err.println("ERROR: handleFileUpload - Validation failed on line " + dataLineNumber + ". Violations: " + violationMsg); // ADDED
                         throw new RuntimeException("Валидация DTO не пройдена: " + violationMsg);
                     }
                     parsedOrganizations.add(dto);
+                    System.out.println("DEBUG: handleFileUpload - DTO successfully created from line " + dataLineNumber + "."); // ADDED
                 } catch (RuntimeException e) {
                     errors.add("Строка " + dataLineNumber + ": " + e.getMessage());
+                    System.err.println("ERROR: handleFileUpload - Parsing or validation error on line " + dataLineNumber + ": " + e.getMessage()); // ADDED
+                    e.printStackTrace();
                 }
             }
+            System.out.println("DEBUG: handleFileUpload - Finished CSV parsing loop. Parsed count: " + parsedOrganizations.size() + ", errors: " + errors.size()); // ADDED
 
         } catch (IOException e) {
             addErrorMessage("Ошибка чтения файла: " + e.getMessage(), e);
+            System.err.println("FATAL ERROR: handleFileUpload - IOException during file read: " + e.getMessage()); // ADDED
             return;
         } catch (Exception e) {
             addErrorMessage("Непредвиденная ошибка парсинга: " + e.getMessage(), e);
+            System.err.println("FATAL ERROR: handleFileUpload - Unexpected exception during parsing: " + e.getMessage()); // ADDED
             return;
         }
 
         if (!errors.isEmpty()) {
             errors.forEach(err -> addErrorMessage(err, null));
             addErrorMessage("Импорт отменён из-за ошибок парсинга данных в файле.", null);
+            System.out.println("DEBUG: handleFileUpload - Import cancelled due to " + errors.size() + " parsing errors."); // ADDED
             return;
         }
 
         if (parsedOrganizations.isEmpty()) {
             addWarnMessage("Нет данных для импорта.", null);
+            System.out.println("DEBUG: handleFileUpload - No organizations found for import."); // ADDED
             return;
         }
 
         // 4. Вызов сервиса для транзакционного импорта
         try {
+            System.out.println("DEBUG: handleFileUpload - Calling service to import " + parsedOrganizations.size() + " organizations."); // ADDED
             int importedCount = organizationService.importFromCsv(parsedOrganizations);
             addInfoMessage("Успешно импортировано " + importedCount + " организаций.", null);
             loadAll();
             loadImportHistory();
+            System.out.println("DEBUG: handleFileUpload - Import successful. Count: " + importedCount); // ADDED
         } catch (RuntimeException e) {
             String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
             addErrorMessage("Импорт отменён (ошибка транзакции): " + msg, null);
+            System.err.println("FATAL ERROR: handleFileUpload - Transactional import failed: " + msg); // ADDED
+            e.printStackTrace();
             loadImportHistory();
         }
+        System.out.println("DEBUG: handleFileUpload - Method finished."); // ADDED
     }
+
+//    private OrganizationRequestDTO parseCsvRecord(CSVRecord record) {
+//        try {
+//            // Вспомогательная функция для получения Trimmed/Cleaned String
+//            java.util.function.Function<String, String> getCleaned = (fieldName) ->
+//                    record.get(fieldName).trim().replace("\"", "");
+//
+//            String annualTurnoverStr = getCleaned.apply("annualTurnover");
+//            double annualTurnover = annualTurnoverStr.isEmpty() ? 0.0 : Double.parseDouble(annualTurnoverStr);
+//
+//            String employeesCountStr = getCleaned.apply("employeesCount");
+//            int employeesCount = employeesCountStr.isEmpty() ? 0 : Integer.parseInt(employeesCountStr);
+//
+//            String ratingStr = getCleaned.apply("rating");
+//            float rating = ratingStr.isEmpty() ? 0.0f : Float.parseFloat(ratingStr);
+//
+//            String coordXStr = getCleaned.apply("coordinates.x");
+//            double coordX = coordXStr.isEmpty() ? 0.0 : Double.parseDouble(coordXStr);
+//
+//            String coordYStr = getCleaned.apply("coordinates.y");
+//            long coordY = coordYStr.isEmpty() ? 0L : Long.parseLong(coordYStr);
+//
+//            // 2. Координаты (ИСПРАВЛЕНО: Используем CoordinatesRequestDTO)
+//            CoordinatesRequestDTO coordinates = CoordinatesRequestDTO.builder()
+//                    .x(coordX)
+//                    .y((int) coordY)
+//                    .build();
+//
+//            // 3. Адреса (ИСПРАВЛЕНО: Используем AddressRequestDTO)
+//            String officialZipCode = getCleaned.apply("officialAddress.zipCode");
+//            AddressRequestDTO officialAddress = AddressRequestDTO.builder()
+//                    .street(getCleaned.apply("officialAddress.street"))
+//                    .zipCode(officialZipCode.isEmpty() ? null : officialZipCode)
+//                    .build();
+//
+//            String postalZipCode = getCleaned.apply("postalAddress.zipCode");
+//            AddressRequestDTO postalAddress = AddressRequestDTO.builder()
+//                    .street(getCleaned.apply("postalAddress.street"))
+//                    .zipCode(postalZipCode.isEmpty() ? null : postalZipCode)
+//                    .build();
+//
+//            // 4. Сборка DTO
+//            return OrganizationRequestDTO.builder()
+//                    .name(getCleaned.apply("name"))
+//                    .fullName(getCleaned.apply("fullName"))
+//                    .type(OrganizationType.valueOf(getCleaned.apply("type").toUpperCase()))
+//                    .annualTurnover(annualTurnover)
+//                    .employeesCount(employeesCount)
+//                    .rating(rating)
+//                    .coordinates(coordinates)
+//                    .officialAddress(officialAddress)
+//                    .postalAddress(postalAddress)
+//                    .build();
+//
+//        } catch (IllegalArgumentException e) {
+//            throw new RuntimeException("Ошибка преобразования типов данных (числа/ENUM): " + e.getMessage(), e);
+//        } catch (Exception e) {
+//            throw new RuntimeException("Ошибка парсинга поля: " + e.getMessage(), e);
+//        }
+//    }
 
     private OrganizationRequestDTO parseCsvRecord(CSVRecord record) {
         try {
@@ -184,26 +340,33 @@ public class OrganizationView implements Serializable {
             java.util.function.Function<String, String> getCleaned = (fieldName) ->
                     record.get(fieldName).trim().replace("\"", "");
 
+            // 1. Парсинг числовых полей
             String annualTurnoverStr = getCleaned.apply("annualTurnover");
             double annualTurnover = annualTurnoverStr.isEmpty() ? 0.0 : Double.parseDouble(annualTurnoverStr);
+            System.out.println("DEBUG: parseCsvRecord - annualTurnover: " + annualTurnover); // ADDED
 
             String employeesCountStr = getCleaned.apply("employeesCount");
             int employeesCount = employeesCountStr.isEmpty() ? 0 : Integer.parseInt(employeesCountStr);
+            System.out.println("DEBUG: parseCsvRecord - employeesCount: " + employeesCount); // ADDED
 
             String ratingStr = getCleaned.apply("rating");
             float rating = ratingStr.isEmpty() ? 0.0f : Float.parseFloat(ratingStr);
+            System.out.println("DEBUG: parseCsvRecord - rating: " + rating); // ADDED
 
             String coordXStr = getCleaned.apply("coordinates.x");
             double coordX = coordXStr.isEmpty() ? 0.0 : Double.parseDouble(coordXStr);
+            System.out.println("DEBUG: parseCsvRecord - coordX: " + coordX); // ADDED
 
             String coordYStr = getCleaned.apply("coordinates.y");
-            long coordY = coordYStr.isEmpty() ? 0L : Long.parseLong(coordYStr);
+            int coordY = coordYStr.isEmpty() ? 0 : Integer.parseInt(coordYStr);
+            System.out.println("DEBUG: parseCsvRecord - coordY: " + coordY); // ADDED
 
             // 2. Координаты (ИСПРАВЛЕНО: Используем CoordinatesRequestDTO)
             CoordinatesRequestDTO coordinates = CoordinatesRequestDTO.builder()
                     .x(coordX)
-                    .y((int) coordY)
+                    .y(coordY)
                     .build();
+            System.out.println("DEBUG: parseCsvRecord - Coordinates: " + coordinates); // ADDED
 
             // 3. Адреса (ИСПРАВЛЕНО: Используем AddressRequestDTO)
             String officialZipCode = getCleaned.apply("officialAddress.zipCode");
@@ -211,18 +374,26 @@ public class OrganizationView implements Serializable {
                     .street(getCleaned.apply("officialAddress.street"))
                     .zipCode(officialZipCode.isEmpty() ? null : officialZipCode)
                     .build();
+            System.out.println("DEBUG: parseCsvRecord - OfficialAddress: " + officialAddress); // ADDED
 
             String postalZipCode = getCleaned.apply("postalAddress.zipCode");
             AddressRequestDTO postalAddress = AddressRequestDTO.builder()
                     .street(getCleaned.apply("postalAddress.street"))
                     .zipCode(postalZipCode.isEmpty() ? null : postalZipCode)
                     .build();
+            System.out.println("DEBUG: parseCsvRecord - PostalAddress: " + postalAddress); // ADDED
 
             // 4. Сборка DTO
+            String name = getCleaned.apply("name");
+            String fullName = getCleaned.apply("fullName");
+            String typeStr = getCleaned.apply("type").toUpperCase();
+            OrganizationType type = OrganizationType.valueOf(typeStr);
+            System.out.println("DEBUG: parseCsvRecord - Name: " + name + ", FullName: " + fullName + ", Type: " + type); // ADDED
+
             return OrganizationRequestDTO.builder()
-                    .name(getCleaned.apply("name"))
-                    .fullName(getCleaned.apply("fullName"))
-                    .type(OrganizationType.valueOf(getCleaned.apply("type").toUpperCase()))
+                    .name(name)
+                    .fullName(fullName)
+                    .type(type)
                     .annualTurnover(annualTurnover)
                     .employeesCount(employeesCount)
                     .rating(rating)
@@ -232,8 +403,11 @@ public class OrganizationView implements Serializable {
                     .build();
 
         } catch (IllegalArgumentException e) {
+            // NumberFormatException или Enum.valueOf() failure
+            System.err.println("FATAL ERROR: parseCsvRecord - Conversion error for record: " + record); // ADDED
             throw new RuntimeException("Ошибка преобразования типов данных (числа/ENUM): " + e.getMessage(), e);
         } catch (Exception e) {
+            System.err.println("FATAL ERROR: parseCsvRecord - Generic parsing error for record: " + record); // ADDED
             throw new RuntimeException("Ошибка парсинга поля: " + e.getMessage(), e);
         }
     }
@@ -245,7 +419,7 @@ public class OrganizationView implements Serializable {
         ExternalContext externalContext = FacesContext.getCurrentInstance().getExternalContext();
         HttpServletRequest request = (HttpServletRequest) externalContext.getRequest();
 
-        String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "ANONYMOUS";
+        String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : "ADMIN";
         boolean isAdmin = request.isUserInRole("ADMIN");
 
         try {

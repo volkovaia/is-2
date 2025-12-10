@@ -30,6 +30,7 @@ public class ImportHistory {
     private String userName;
 
     // Время начала операции
+    @Builder.Default
     @Column(nullable = false)
     private LocalDateTime startDate = LocalDateTime.now();
 

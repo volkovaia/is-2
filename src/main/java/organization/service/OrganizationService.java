@@ -40,7 +40,7 @@ public class OrganizationService {
             // Principal principal = ((jakarta.ejb.EJBContext)sc).getCallerPrincipal();
 
             // Заглушка, так как контекст безопасности сложен для получения из сервиса без EJB/REST
-            return "user_jsf"; // Временно
+            return "ADMIN"; // Временно
         } catch (NamingException e) {
             return "UNKNOWN_USER";
         }
@@ -54,14 +54,14 @@ public class OrganizationService {
     public int importFromCsv(List<OrganizationRequestDTO> organizationRequestDTOS) {
 
         String username = getCurrentUsername();
-
+        System.out.println("userName: " + username);
         ImportHistory history = new ImportHistory();
         history.setUserName(username);
         history.setStatus(ImportStatus.IN_PROGRESS);
 
         // 1. Сохраняем начальный статус в отдельной транзакции (ImportHistoryService должен быть EJB)
         history = historyService.save(history);
-
+        System.out.println("history got");
         int successfulCount = 0;
         try {
             for (OrganizationRequestDTO dto : organizationRequestDTOS) {
@@ -77,11 +77,13 @@ public class OrganizationService {
                 org.setCreationDate(null);
                 organizationRepository.create(org);
                 successfulCount++;
+                System.out.println("successful count: " + successfulCount);
             }
-
+            System.out.println("finished with organizations");
             // Если дошли до конца цикла, фиксируем транзакцию и обновляем историю
             historyService.updateStatus(history.getId(), ImportStatus.SUCCESS, successfulCount, null);
-            return successfulCount; // Возвращаем количество созданных
+            System.out.println("history status: success");
+            return successfulCount;
 
         } catch (ValidationException | IllegalArgumentException e) {
             // 4. ОШИБКА: Откат транзакции (автоматически из-за @Transactional)

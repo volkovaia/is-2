@@ -29,7 +29,7 @@
         <button type="button" onclick="openModal('maxFullNameModal')">Макс. fullName</button>
         <button type="button" onclick="openModal('countPostalModal')">Считать по адресу</button>
         <button type="button" onclick="openModal('countTypeModal')">Считать по типу</button>
-        <button type="button" onclick="openModal('mergeModal')">Объединить</button>
+        <button type="button" onclick="openModal('mergeModal')">ОБЪЕДИНИТЬ</button>
         <button type="button" onclick="openModal('absorbModal')">Поглотить</button>
 
 
@@ -653,7 +653,6 @@
         <h:commandButton value="Обновить историю" action="#{organizationView.loadImportHistory}">
             <f:ajax execute="@this" render="historyTable" />
         </h:commandButton>
-        <!-- Автообновление (опционально, можно убрать) -->
         <p:poll interval="10" listener="#{organizationView.loadImportHistory}" update="historyTable" />
     </h:form>
 
